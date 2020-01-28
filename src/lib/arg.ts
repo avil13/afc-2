@@ -1,22 +1,15 @@
 type DefaultValue = null | string | number | boolean;
 
 export class Arg {
-  private static instance?: Arg;
   private argv: string[] = [];
   private argItems: any = {};
 
   constructor(...argumentsList: any[]) {
-    if (Arg.instance) {
-      return Arg.instance;
-    }
-
     if (!(this instanceof Arg)) {
       return new Arg(...argumentsList);
     }
 
-    this.argv = process.argv.slice(2);
-
-    Arg.instance = this;
+    this.argv = argumentsList.length ? argumentsList : process.argv.slice(2);
   }
 
   param(
@@ -48,7 +41,7 @@ export class Arg {
     key: string;
     defaultValue: DefaultValue;
     description: string;
-    type?: ArgumentType;
+    type?: string | boolean | number;
   }) {
     /* eslint-disable @typescript-eslint/no-this-alias */
     const self = this;
@@ -59,13 +52,13 @@ export class Arg {
       get value() {
         const val = self.getArgumentValue(options.key, options.defaultValue);
 
-        switch (options.type) {
-          case String:
-            return '' + val;
-          case Boolean:
+        switch (typeof options.type) {
+          case 'string':
+            return `${val}`;
+          case 'boolean':
             return !!val;
-          case Number:
-            return +val;
+          case 'number':
+            return +(val || 0);
           default:
             return val;
         }
