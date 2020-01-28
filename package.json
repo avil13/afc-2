@@ -1,12 +1,12 @@
 {
-  "name": "teplate-ts-package",
+  "name": "tepmlate-ts-package",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/types",
   "scripts": {
     "start": "npm run build && node dist/index.js",
-    "dev": "ts-node --inspect=5858 --project tsconfig.json src/index.ts",
+    "dev": "ts-node --project tsconfig.json src/index.ts",
     "dev:watch": "nodemon",
     "lint:fix": "eslint --fix --ext .js,.ts .",
     "test": "jest",
