@@ -1,15 +1,29 @@
 type DefaultValue = null | string | number | boolean;
 
 export class Arg {
-  private argv: string[] = [];
-  private argItems: any = {};
+  private _argv: string[] = [];
+  private _argItems: any = {};
 
-  constructor(...argumentsList: any[]) {
+  constructor(...argumentsList: string[]) {
     if (!(this instanceof Arg)) {
       return new Arg(...argumentsList);
     }
 
-    this.argv = argumentsList.length ? argumentsList : process.argv.slice(2);
+    this.readArguments(...argumentsList);
+  }
+
+  get arguments() {
+    return [...this._argv];
+  }
+
+  readArguments(...argumentsList: string[]) {
+    this._argv = argumentsList.length ? argumentsList : process.argv.slice(2);
+    this._argItems = {};
+    return this;
+  }
+
+  val(key: string, defaultValue: DefaultValue = null) {
+    return (this._argItems[key] && this._argItems[key].value) || defaultValue;
   }
 
   param(
@@ -18,20 +32,35 @@ export class Arg {
     description: string,
     type?: boolean | number | string
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    // const self = this;
+    let parentKey = '';
+
     nameItem
       .split(',')
       .map(s => s.trim())
-      .forEach(key => {
-        if (this.argItems[key]) {
+      .forEach((key, i) => {
+        if (this._argItems[key]) {
           throw new Error(`Argument "${key}" already defined.`);
         }
 
-        this.argItems[key] = this.makeParam({
-          key,
-          defaultValue,
-          description,
-          type,
-        });
+        if (i === 0) {
+          parentKey = key;
+
+          this._argItems[key] = this.makeParam({
+            key,
+            defaultValue,
+            description,
+            type,
+          });
+        } else {
+          this._argItems[key] = {
+            _parent$: parentKey,
+            // get value() {
+            //   return self._argItems[this._parent$].value;
+            // },
+          };
+        }
       });
 
     return this;
@@ -50,7 +79,7 @@ export class Arg {
     return {
       ...options,
       get value() {
-        const val = self.getArgumentValue(options.key, options.defaultValue);
+        const val = self.getArgumentValue(options.key);
 
         switch (typeof options.type) {
           case 'string':
@@ -66,16 +95,29 @@ export class Arg {
     };
   }
 
-  private getArgumentValue(key: string, defaultValue: DefaultValue) {
-    const index = this.argv.indexOf(key);
+  private getArgumentValue(key: string) {
+    key = this.getActiveArgumentKey(key);
+
+    console.log('=>', key);
+
+    // todo: !!!
+    const index = this._argv.indexOf(key);
 
     if (index === -1) {
       return null;
     }
 
-    const names = Object.keys(this.argItems);
-    const nextArgument = this.argv[index + 1];
+    const names = Object.keys(this._argItems);
+    const nextArgumentAsValue = this._argv[index + 1];
 
-    return names.includes(nextArgument) ? defaultValue : nextArgument;
+    const value = (this._argItems[key] && this._argItems[key].value) || null;
+
+    return names.includes(nextArgumentAsValue) ? value : nextArgumentAsValue;
+  }
+
+  private getActiveArgumentKey(key: string): string {
+    return (this._argItems[key] && this._argItems[key]._parent$) || key;
   }
 }
+
+export const arg = new Arg();

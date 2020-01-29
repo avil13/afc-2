@@ -1,15 +1,30 @@
-import { Arg } from '@/lib/arg';
+import { arg } from '@/lib/arg';
 
 describe('Test Arg class', () => {
-  // it('should exist', () => {
-  //   const arg = new Arg('--hello');
+  /*
+  it('should exist', () => {
+    expect(arg).toBeTruthy();
+  });
 
-  //   expect(arg).toBeTruthy();
-  // });
+  it('show arguments', () => {
+    arg.readArguments('--hello', 'world');
 
-  it.skip('show arguments', () => {
-    const arg = new Arg('--hello');
+    expect(arg.arguments).toEqual(['--hello', 'world']);
+  });
 
-    expect(arg).toBe([]);
+  //*/
+
+  it('add parameter', () => {
+    const repo1 = 'my@github.com/repo';
+    const repo2 = 'git@github.com/some-repo';
+
+    arg.readArguments('--clone', repo1);
+
+    arg.param('--clone, -c', repo2, 'Clone repo');
+
+    expect(arg).toBe({});
+
+    expect(arg.val('-c')).toBe(repo1);
+    // expect(arg.val('--clone')).toBe(repo1);
   });
 });
