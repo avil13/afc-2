@@ -1,19 +1,34 @@
 type DefaultValue = null | string | number | boolean;
 
+export interface IArgOptions {
+  [key: string]: IArgOptionItem;
+}
+
+export interface IArgOptionItem {
+  type: 'string' | 'number' | 'array' | 'boolean';
+  default?: string | number | boolean;
+  description?: string;
+  alias?: string;
+  string?: boolean;
+}
+
 export class Arg {
   private _argv: string[] = [];
   private _argItems: any = {};
+  private static _singletonInstance: Arg;
 
   constructor(...argumentsList: string[]) {
     if (!(this instanceof Arg)) {
       return new Arg(...argumentsList);
     }
 
-    this.readArguments(...argumentsList);
-  }
+    if (Arg._singletonInstance) {
+      return Arg._singletonInstance;
+    }
 
-  get arguments() {
-    return [...this._argv];
+    Arg._singletonInstance = this;
+
+    this.readArguments(...argumentsList);
   }
 
   readArguments(...argumentsList: string[]) {
@@ -21,6 +36,29 @@ export class Arg {
     this._argItems = {};
     return this;
   }
+
+  parse(...args: string[]) {
+    const argStr = args.join(' ');
+    const reg = /-{1,2}([^\s]+)(.*?(?=\s-)|.*)/g;
+
+    argStr.replace(reg, ($0, key, value, ...xx) => {
+      if (!value) {
+        this._argItems[key] = true;
+      } else {
+        const v = value
+          .split(/\s/)
+          .filter((v: string) => !!v)
+          .map((v: string) => v.trim());
+
+        this._argItems[key] = v.length > 1 ? v : v[0];
+      }
+      return $0;
+    });
+
+    return this;
+  }
+
+  setOptions(options: object) {}
 
   val(key: string, defaultValue: DefaultValue = null) {
     return (this._argItems[key] && this._argItems[key].value) || defaultValue;
@@ -38,7 +76,7 @@ export class Arg {
 
     nameItem
       .split(',')
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .forEach((key, i) => {
         if (this._argItems[key]) {
           throw new Error(`Argument "${key}" already defined.`);
@@ -119,5 +157,3 @@ export class Arg {
     return (this._argItems[key] && this._argItems[key]._parent$) || key;
   }
 }
-
-export const arg = new Arg();

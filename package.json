@@ -1,16 +1,17 @@
 {
-  "name": "tepmlate-ts-package",
-  "version": "1.0.0",
+  "name": "app-front-creator",
+  "version": "2.0.0",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/types",
+  "public": true,
   "scripts": {
     "start": "npm run build && node dist/index.js",
     "dev": "ts-node --project tsconfig.json src/index.ts",
     "dev:watch": "nodemon",
     "lint:fix": "eslint --fix --ext .js,.ts .",
     "test": "jest",
-    "test:watch": "jest --watch",
+    "test:watch": "jest --watch --onlyChanged",
     "type-check": "tsc -p . --noEmit",
     "type-check:watch": "npm run type-check -- --watch",
     "build": "rm -rf ./dist && tsc -p ."
