@@ -4,12 +4,8 @@ export interface IArgOptions {
 
 type DefaultValue = null | string | number | boolean;
 
-export interface IArgParamItem {
-  type: 'string' | 'number' | 'array' | 'boolean';
-  default?: string | number | boolean;
-  description?: string;
-  alias?: string;
-  string?: boolean;
+export interface IArgHelpWrapper {
+  [key: string]: IParamItem;
 }
 
 export interface IParamItem {
@@ -19,8 +15,16 @@ export interface IParamItem {
   type?: IArgParamItem['type'];
 }
 
-export interface IArgHelpWrapper {
-  [key: string]: IParamItem;
+export interface IArgParamList {
+  [key: string]: IArgParamItem;
+}
+
+export interface IArgParamItem {
+  type: 'string' | 'number' | 'array' | 'boolean';
+  default?: string | number | boolean | string[];
+  description?: string;
+  alias?: string;
+  string?: boolean;
 }
 
 /**
@@ -35,6 +39,8 @@ export class Arg {
 
   private _allArgNames: string[] = [];
 
+  private static _singletonInstance: Arg;
+
   constructor(options?: IArgOptions) {
     if (!(this instanceof Arg)) {
       return new Arg(options);
@@ -43,6 +49,12 @@ export class Arg {
     if (options?.isTest) {
       return;
     }
+
+    if (Arg._singletonInstance) {
+      return Arg._singletonInstance;
+    }
+
+    Arg._singletonInstance = this;
 
     this.parseArgv();
   }
@@ -160,6 +172,26 @@ export class Arg {
         return Array.isArray(value) ? value.join(' ') : String(value);
     }
     return value;
+  }
+
+  params(params: IArgParamList) {
+    let parameter: IArgParamItem;
+    let key = '';
+    for (let k in params) {
+      if (Object.prototype.hasOwnProperty.call(params, k)) {
+        key = k;
+        parameter = params[k];
+        if (parameter.alias) {
+          key = [k, parameter.alias].join(',');
+        }
+        this.param(
+          key,
+          parameter.default,
+          parameter.description,
+          parameter.type
+        );
+      }
+    }
   }
 
   /**

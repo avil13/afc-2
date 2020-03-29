@@ -1,4 +1,4 @@
-import { IArgParamItem } from './../../src/lib/arg';
+import { IArgParamItem, IArgParamList } from './../../src/lib/arg';
 import { Arg } from '@/lib/arg';
 
 describe('Test Arg class', () => {
@@ -83,5 +83,21 @@ describe('Test Arg class', () => {
     expect(arg.val('str')).toBe(defaultStr);
   });
 
-  it.skip('set param by options', () => {});
+  it('set params by options', () => {
+    const defaultVal = 101;
+
+    const params: IArgParamList = {
+      num: {
+        type: 'number',
+        alias: 'n',
+        default: defaultVal,
+        description: 'max value',
+      },
+    };
+
+    arg.params(params);
+
+    expect(arg.val('num')).toBe(defaultVal);
+    expect(arg.val('n')).toBe(defaultVal);
+  });
 });
