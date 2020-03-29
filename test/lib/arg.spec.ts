@@ -1,29 +1,12 @@
+import { IArgParamItem } from './../../src/lib/arg';
 import { Arg } from '@/lib/arg';
 
 describe('Test Arg class', () => {
   let arg: Arg;
 
   beforeEach(() => {
-    //@ts-ignore
-    Arg._singletonInstance = undefined;
-    arg = new Arg();
+    arg = new Arg({ isTest: true });
   });
-
-  it.skip('add parameter', () => {
-    const repo1 = 'my@github.com/repo';
-    const repo2 = 'git@github.com/some-repo';
-
-    arg.readArguments('--clone', repo1);
-
-    arg.param('--clone, -c', repo2, 'Clone repo');
-
-    expect(arg).toBe({});
-
-    expect(arg.val('-c')).toBe(repo1);
-    // expect(arg.val('--clone')).toBe(repo1);
-  });
-
-  it.skip('readArguments', () => {});
 
   it.each([
     ///
@@ -38,14 +21,67 @@ describe('Test Arg class', () => {
   ])('parse args (%s)', (input, expected) => {
     arg.parse(input);
     //@ts-ignore
-    expect(arg._argItems).toEqual(expected);
+    expect(arg._argRawItems).toEqual(expected);
   });
 
-  it.skip('set param by signature', () => {});
+  describe('val:', () => {
+    beforeEach(() => {
+      arg.parse('--param 01');
+    });
+
+    it('defaut', () => {
+      expect(arg.val('param')).toBe('01');
+    });
+
+    it('string', () => {
+      expect(arg.val.str('param')).toBe('01');
+    });
+
+    it('number', () => {
+      expect(arg.val.num('param')).toBe(1);
+    });
+
+    it('boolean', () => {
+      expect(arg.val.bool('param')).toBe(true);
+    });
+
+    it('array', () => {
+      expect(arg.val.arr('param')).toEqual(['01']);
+    });
+  });
+
+  it.each(<[IArgParamItem['type'], any, any][]>[
+    /// type, input, output
+    ['string', 101, '101'],
+    ['string', true, 'true'],
+    ['number', true, 1],
+    ['number', false, 0],
+    ['boolean', '', false],
+    ['boolean', '0', true],
+    ['array', 'xxx', ['xxx']],
+    //
+  ])('convertToType(%s, %o): %o', (type, input, expected) => {
+    expect(arg.convertToType(type, input)).toEqual(expected);
+  });
+
+  it.each([
+    ///
+    ['--clone https://github.com/avil13', 'clone', 'c'],
+    // ['-c https://github.com/avil13', 'clone', 'c'],
+  ])('argument alias are equal (%s, %s, %s)', (input, alias1, alias2) => {
+    arg.parse(input);
+    arg.param(`${alias1},${alias2}`, '', 'some description');
+
+    expect(arg.val(alias1) === arg.val(alias2)).toBe(true);
+  });
+
+  it('set param by signature', () => {
+    const defaultStr = 'default data';
+
+    arg.param('str,s', defaultStr, '...', 'string');
+
+    expect(arg.val('str')).toBe(defaultStr);
+  });
+
   it.skip('set param by options', () => {});
-
-  it.skip('argument alias are equal ', () => {
-    // prepare
-    expect(arg.val('c') === arg.val('clone')).toBe(true);
-  });
 });

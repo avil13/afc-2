@@ -1,10 +1,10 @@
-type DefaultValue = null | string | number | boolean;
-
 export interface IArgOptions {
-  [key: string]: IArgOptionItem;
+  isTest?: boolean;
 }
 
-export interface IArgOptionItem {
+type DefaultValue = null | string | number | boolean;
+
+export interface IArgParamItem {
   type: 'string' | 'number' | 'array' | 'boolean';
   default?: string | number | boolean;
   description?: string;
@@ -12,45 +12,59 @@ export interface IArgOptionItem {
   string?: boolean;
 }
 
+export interface IParamItem {
+  keys: string[];
+  defaultValue?: DefaultValue;
+  description?: string;
+  type?: IArgParamItem['type'];
+}
+
+export interface IArgHelpWrapper {
+  [key: string]: IParamItem;
+}
+
+/**
+ * Class for working with cli arguments
+ *
+ */
 export class Arg {
-  private _argv: string[] = [];
-  private _argItems: any = {};
-  private static _singletonInstance: Arg;
+  // list parsed arguments
+  private _argRawItems: any = {};
 
-  constructor(...argumentsList: string[]) {
+  private _argHelpWrapper: IArgHelpWrapper = {};
+
+  private _allArgNames: string[] = [];
+
+  constructor(options?: IArgOptions) {
     if (!(this instanceof Arg)) {
-      return new Arg(...argumentsList);
+      return new Arg(options);
     }
 
-    if (Arg._singletonInstance) {
-      return Arg._singletonInstance;
+    if (options?.isTest) {
+      return;
     }
 
-    Arg._singletonInstance = this;
-
-    this.readArguments(...argumentsList);
+    this.parseArgv();
   }
 
-  readArguments(...argumentsList: string[]) {
-    this._argv = argumentsList.length ? argumentsList : process.argv.slice(2);
-    this._argItems = {};
-    return this;
+  parseArgv() {
+    this.parse.apply(this, process.argv.slice(2));
   }
 
   parse(...args: string[]) {
     const argStr = args.join(' ');
     const reg = /-{1,2}([^\s]+)(.*?(?=\s-)|.*)/g;
 
-    argStr.replace(reg, ($0, key, value, ...xx) => {
+    argStr.replace(reg, ($0, key, value) => {
       if (!value) {
-        this._argItems[key] = true;
+        this._argRawItems[key] = true;
       } else {
         const v = value
-          .split(/\s/)
+          .split(/\s{1,}/)
           .filter((v: string) => !!v)
           .map((v: string) => v.trim());
 
-        this._argItems[key] = v.length > 1 ? v : v[0];
+        this._argRawItems[key] = v.length > 1 ? v : v[0];
       }
       return $0;
     });
@@ -58,102 +72,165 @@ export class Arg {
     return this;
   }
 
-  setOptions(options: object) {}
+  get val() {
+    const fn = (key: string) => {
+      this.checkKey(key);
+      const opt = this.getOptionsByKey(key);
 
-  val(key: string, defaultValue: DefaultValue = null) {
-    return (this._argItems[key] && this._argItems[key].value) || defaultValue;
+      const value = this.getValueByKey(key);
+
+      if (opt?.type) {
+        return this.convertToType(opt.type, value || opt.defaultValue);
+      }
+      return value;
+    };
+
+    fn.str = (key: string) => {
+      return this.convertToType('string', fn(key));
+    };
+    fn.num = (key: string) => {
+      return this.convertToType('number', fn(key));
+    };
+    fn.bool = (key: string) => {
+      return this.convertToType('boolean', fn(key));
+    };
+    fn.arr = (key: string) => {
+      return this.convertToType('array', fn(key));
+    };
+
+    return fn;
   }
 
+  checkKey(key: string) {
+    if (this._argRawItems[key] === undefined && !this.getOptionsByKey(key)) {
+      throw new Error(`Can't find argument "${key}"`);
+    }
+  }
+
+  private getValueByKey(key: string) {
+    if (this._argRawItems[key]) {
+      return this._argRawItems[key];
+    }
+    const options = this.getOptionsByKey(key);
+    if (options) {
+      const len = options.keys.length;
+      for (let i = 0; i < len; i++) {
+        const optionKey = options.keys[i];
+
+        if (this._argRawItems[optionKey]) {
+          return this._argRawItems[optionKey];
+        }
+      }
+    }
+  }
+
+  private getOptionsByKey(key: string) {
+    let option;
+    let keyLen = 0;
+    for (let k in this._argHelpWrapper) {
+      if (Object.prototype.hasOwnProperty.call(this._argHelpWrapper, k)) {
+        option = this._argHelpWrapper[k];
+        keyLen = option.keys.length;
+
+        for (let i = 0; i < keyLen; i++) {
+          if (option.keys[i] === key) {
+            return option;
+          }
+        }
+      }
+    }
+  }
+
+  convertToType(
+    type: IArgParamItem['type'],
+    value: DefaultValue | DefaultValue[]
+  ) {
+    switch (type) {
+      case 'boolean':
+        if (typeof value === 'string' && ['true', 'false'].includes('value')) {
+          return value === 'true';
+        }
+        return Boolean(value);
+      case 'number':
+        return Number(value);
+        return;
+      case 'array':
+        return Array.isArray(value) ? value : [value];
+      case 'string':
+        return Array.isArray(value) ? value.join(' ') : String(value);
+    }
+    return value;
+  }
+
+  /**
+   *
+   * @param {string} name name of param, can be split by semicolon
+   * @param defaultValue
+   * @param description
+   * @param type
+   *
+   * @example
+   * const arg = new Arg();
+   * arg.param('version,v', 'v0.0.1', 'Show version');
+   */
   param(
-    nameItem: string,
-    defaultValue: DefaultValue,
-    description: string,
-    type?: boolean | number | string
+    name: string,
+    defaultValue?: any,
+    description?: string,
+    type?: IArgParamItem['type']
   ) {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    // const self = this;
+    const self = this;
     let parentKey = '';
 
-    nameItem
+    name
       .split(',')
       .map((s) => s.trim())
       .forEach((key, i) => {
-        if (this._argItems[key]) {
+        if (this._allArgNames.includes(key)) {
           throw new Error(`Argument "${key}" already defined.`);
         }
+
+        this._allArgNames.push(key);
 
         if (i === 0) {
           parentKey = key;
 
-          this._argItems[key] = this.makeParam({
-            key,
+          this._argHelpWrapper[parentKey] = {
+            keys: [key],
             defaultValue,
             description,
             type,
-          });
-        } else {
-          this._argItems[key] = {
-            _parent$: parentKey,
-            // get value() {
-            //   return self._argItems[this._parent$].value;
-            // },
           };
+        } else {
+          this._argHelpWrapper[parentKey].keys.push(key);
         }
       });
 
     return this;
   }
 
-  private makeParam(options: {
-    key: string;
-    defaultValue: DefaultValue;
-    description: string;
-    type?: string | boolean | number;
-  }) {
-    /* eslint-disable @typescript-eslint/no-this-alias */
-    const self = this;
-    /* eslint-enable @typescript-eslint/no-this-alias */
+  getHelp(): string {
+    const results: string[] = [];
 
-    return {
-      ...options,
-      get value() {
-        const val = self.getArgumentValue(options.key);
-
-        switch (typeof options.type) {
-          case 'string':
-            return `${val}`;
-          case 'boolean':
-            return !!val;
-          case 'number':
-            return +(val || 0);
-          default:
-            return val;
-        }
-      },
-    };
-  }
-
-  private getArgumentValue(key: string) {
-    key = this.getActiveArgumentKey(key);
-
-    console.log('=>', key);
-
-    // todo: !!!
-    const index = this._argv.indexOf(key);
-
-    if (index === -1) {
-      return null;
+    for (let k in this._argHelpWrapper) {
+      if (Object.prototype.hasOwnProperty.call(this._argHelpWrapper, k)) {
+        results;
+      }
     }
 
-    const names = Object.keys(this._argItems);
-    const nextArgumentAsValue = this._argv[index + 1];
-
-    const value = (this._argItems[key] && this._argItems[key].value) || null;
-
-    return names.includes(nextArgumentAsValue) ? value : nextArgumentAsValue;
+    return results.join('\n');
   }
 
-  private getActiveArgumentKey(key: string): string {
-    return (this._argItems[key] && this._argItems[key]._parent$) || key;
+  getHelpString(item: IParamItem): string {
+    const keys = item.keys
+      .map((v, i) => `${i === 0 ? '-' : ''}-${v}`)
+      .join(', ');
+    const description = item.description || '';
+    const defaultValue = item.defaultValue && `default: ${item.defaultValue}`;
+
+    return [` ${keys}`, defaultValue, description]
+      .filter((v) => !!v)
+      .join('\t');
   }
 }
